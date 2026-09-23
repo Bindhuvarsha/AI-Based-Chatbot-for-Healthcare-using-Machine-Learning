@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeeva Raksha - Test Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loading { display: none; }
+        .loading.show { display: block; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold text-center text-blue-600 mb-8">Jeeva Raksha - Test Interface</h1>
+
+        <!-- Health Check -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-semibold mb-4">Backend Status</h2>
+            <button id="healthBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">
+                Check Backend Health
+            </button>
+            <div id="healthResult" class="mt-4 p-4 bg-gray-50 rounded"></div>
+        </div>
+
+        <!-- Symptom Analysis -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-semibold mb-4">Symptom Analysis</h2>
+            <input type="text" id="symptomsInput" placeholder="Enter symptoms (comma separated)"
+                   class="w-full p-3 border border-gray-300 rounded mb-4">
+            <button id="analyzeBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                Analyze Symptoms
+            </button>
+            <div id="analysisResult" class="mt-4 p-4 bg-gray-50 rounded"></div>
+        </div>
+
+        <!-- Similar Diseases -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-semibold mb-4">Similar Diseases</h2>
+            <input type="text" id="diseasesInput" placeholder="Enter symptoms"
+                   class="w-full p-3 border border-gray-300 rounded mb-4">
+            <button id="diseasesBtn" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded">
+                Find Similar Diseases
+            </button>
+            <div id="diseasesResult" class="mt-4 p-4 bg-gray-50 rounded"></div>
+        </div>
+
+        <!-- Hospital Search -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-semibold mb-4">Nearby Hospitals</h2>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <input type="number" id="latInput" placeholder="Latitude" step="any"
+                       class="p-3 border border-gray-300 rounded">
+                <input type="number" id="lngInput" placeholder="Longitude" step="any"
+                       class="p-3 border border-gray-300 rounded">
+            </div>
+            <button id="hospitalsBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">
+                Find Hospitals
+            </button>
+            <div id="hospitalsResult" class="mt-4 p-4 bg-gray-50 rounded"></div>
+        </div>
+
+        <!-- Loading indicator -->
+        <div id="loading" class="loading fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div class="bg-white p-6 rounded-lg">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                <p class="mt-4 text-center">Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+
+        // Utility functions
+        function showLoading() {
+            document.getElementById('loading').classList.add('show');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('show');
+        }
+
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<pre class="${isError ? 'text-red-600' : 'text-green-600'}">${JSON.stringify(data, null, 2)}</pre>`;
+        }
+
+        // Health check
+        document.getElementById('healthBtn').addEventListener('click', async () => {
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                showResult('healthResult', data);
+            } catch (error) {
+                showResult('healthResult', { error: error.message }, true);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Symptom analysis
+        document.getElementById('analyzeBtn').addEventListener('click', async () => {
+            const symptoms = document.getElementById('symptomsInput').value;
+            if (!symptoms.trim()) {
+                alert('Please enter symptoms');
+                return;
+            }
+
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE}/analyze-symptoms`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symptoms: symptoms.split(',').map(s => s.trim()) })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    showResult('analysisResult', { error: data.detail || 'Failed to analyze symptoms' }, true);
+                } else {
+                    showResult('analysisResult', data);
+                }
+            } catch (error) {
+                showResult('analysisResult', { error: error.message }, true);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Similar diseases
+        document.getElementById('diseasesBtn').addEventListener('click', async () => {
+            const symptoms = document.getElementById('diseasesInput').value;
+            if (!symptoms.trim()) {
+                alert('Please enter symptoms');
+                return;
+            }
+
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE}/similar-diseases`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symptoms: symptoms.split(',').map(s => s.trim()) })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    showResult('diseasesResult', { error: data.detail || 'Failed to fetch similar diseases' }, true);
+                } else {
+                    showResult('diseasesResult', data);
+                }
+            } catch (error) {
+                showResult('diseasesResult', { error: error.message }, true);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Hospital search
+        document.getElementById('hospitalsBtn').addEventListener('click', async () => {
+            const lat = document.getElementById('latInput').value;
+            const lng = document.getElementById('lngInput').value;
+
+            if (!lat || !lng) {
+                alert('Please enter both latitude and longitude');
+                return;
+            }
+
+            showLoading();
+            try {
+                const response = await fetch(`${API_BASE}/nearby-hospitals?lat=${lat}&lng=${lng}`);
+                const data = await response.json();
+                if (!response.ok) {
+                    showResult('hospitalsResult', { error: data.detail || 'Failed to fetch nearby hospitals' }, true);
+                } else {
+                    showResult('hospitalsResult', data);
+                }
+            } catch (error) {
+                showResult('hospitalsResult', { error: error.message }, true);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Auto-check health on load
+        window.addEventListener('load', () => {
+            document.getElementById('healthBtn').click();
+        });
+    </script>
+</body>
+</html>
