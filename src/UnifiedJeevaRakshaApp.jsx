@@ -42,7 +42,21 @@ const ModuleRouter = ({ activeModule, onNavigate, viewMode, setViewMode }) => {
   // If not logged in or active module is login, show the clean full-screen Login Page matching Page 3
   if (!isAuthenticated || activeModule === '01_login') {
     return (
-      <div className="min-h-screen bg-[#F5F7FB] flex flex-col justify-center items-center p-3 sm:p-6 lg:p-8">
+      <div className="min-h-screen bg-[#F5F7FB] flex flex-col justify-center items-center p-3 sm:p-6 lg:p-8 relative">
+        <div className="w-full max-w-7xl flex flex-wrap justify-between items-center mb-3 gap-2">
+          <button
+            onClick={() => setViewMode('classic')}
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-white text-slate-700 shadow-sm border border-slate-200 hover:bg-slate-50 transition flex items-center gap-2 cursor-pointer"
+          >
+            📱 Switch to Classic Mobile App View
+          </button>
+          <button
+            onClick={() => onNavigate('02_home')}
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white shadow-sm hover:bg-blue-700 transition flex items-center gap-2 cursor-pointer"
+          >
+            🚀 Skip Login / Enter Patient Portal →
+          </button>
+        </div>
         <LoginModule onNavigate={onNavigate} />
       </div>
     );

@@ -50,7 +50,7 @@ export const AiHealthAssistantModule = ({ onNavigate }) => {
     'Book doctor appointment'
   ];
 
-  const handleSend = (textToSend) => {
+  const handleSend = async (textToSend) => {
     const text = textToSend || inputVal;
     if (!text.trim()) return;
 
@@ -58,7 +58,18 @@ export const AiHealthAssistantModule = ({ onNavigate }) => {
     setMessages((prev) => [...prev, userMsg]);
     setInputVal('');
 
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, language: 'English' })
+      });
+      if (!res.ok) throw new Error('API returned ' + res.status);
+      const data = await res.json();
+      const reply = data.response || data.message || "I am here to assist with your medical questions.";
+      setMessages((prev) => [...prev, { sender: 'bot', text: reply, time: 'Just now' }]);
+    } catch (err) {
+      console.warn('Backend call failed, using fallback:', err);
       let reply = `I have analyzed your query about "${text}". `;
       if (text.toLowerCase().includes('paracetamol')) {
         reply += 'Paracetamol (500mg/650mg) is commonly used for mild to moderate fever and pain relief. Usual adult interval is every 6-8 hours with food. Do not exceed 3000mg in 24 hours.';
@@ -68,7 +79,7 @@ export const AiHealthAssistantModule = ({ onNavigate }) => {
         reply += 'Maintaining balanced hydration, light physical exercise, and regular sleep rhythms will significantly support your wellness. Would you like me to connect you with a doctor?';
       }
       setMessages((prev) => [...prev, { sender: 'bot', text: reply, time: 'Just now' }]);
-    }, 800);
+    }
   };
 
   return (

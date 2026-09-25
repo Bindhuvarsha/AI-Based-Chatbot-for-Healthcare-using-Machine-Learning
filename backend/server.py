@@ -219,14 +219,29 @@ async def chat_endpoint(req: ChatRequest):
         else:
             cat = responses["default"]
             answer = cat.get(normalized_lang) or cat.get("English", "")
-
     timestamp = datetime.now(timezone.utc).isoformat()
+    
+    # Extract symptoms and possible diagnosis if symptoms present in user message
+    extracted_symptoms = [sym for sym in medical_dataset.symptom_disease_map if sym in msg]
+    diagnosis_obj = None
+    if extracted_symptoms:
+        preds = medical_dataset.predict_symptoms(extracted_symptoms)
+        if preds:
+            diagnosis_obj = {
+                "conditions": preds,
+                "confidence": preds[0]["confidence"],
+                "recommended_specialties": ["General Physician"] if "fever" in msg or "cold" in msg else ["Specialist"]
+            }
+
     return {
         "success": True,
-        "message": req.message,
+        "message": answer,
         "response": answer,
+        "reply": answer,
         "language": normalized_lang,
         "isAyurveda": is_ayurveda,
+        "symptoms_updated": extracted_symptoms,
+        "diagnosis": diagnosis_obj,
         "timestamp": timestamp
     }
 
@@ -237,15 +252,92 @@ async def predict_symptoms_endpoint(req: SymptomPredictionRequest):
         return {
             "success": False,
             "error": "No symptoms provided.",
+            "possible_conditions": [],
+            "severity": "mild",
+            "doctor": "General Physician",
+            "recommendations": ["No symptoms provided. Please select symptoms."],
+            "medicines": [],
+            "symptoms": [],
             "predictions": {"conditions": [], "confidence": 0}
         }
 
     results = medical_dataset.predict_symptoms(req.symptoms)
     timestamp = datetime.now(timezone.utc).isoformat()
 
+    lower_syms_str = " ".join(s.lower() for s in req.symptoms)
+    is_severe = any(k in lower_syms_str for k in ["chest pain", "breathless", "shortness of breath", "severe", "heart"])
+
+    if is_severe:
+        severity = "severe"
+        doctor = "Cardiologist / Emergency Physician"
+        recommendations = [
+            "🚨 Seek immediate emergency medical attention or dial 108.",
+            "Sit or lie down in a comfortable position and remain calm.",
+            "Avoid any physical exertion.",
+            "Keep emergency contact persons notified."
+        ]
+        medicines = ["Aspirin 75mg (if prescribed)", "Emergency Evaluation Required"]
+    elif any(k in lower_syms_str for k in ["fever", "temperature", "chills"]):
+        severity = "moderate"
+        doctor = "General Physician"
+        recommendations = [
+            "Monitor body temperature every 4 to 6 hours.",
+            "Drink plenty of water and ORS electrolytes to maintain hydration.",
+            "Get adequate rest and sleep.",
+            "Consult a physician if temperature stays above 101°F for over 48 hours."
+        ]
+        medicines = ["Paracetamol 650mg (Dolo)", "ORS Electrolyte Solution", "Multivitamin"]
+    elif any(k in lower_syms_str for k in ["cold", "cough", "sneeze", "throat"]):
+        severity = "mild"
+        doctor = "General Physician or ENT Specialist"
+        recommendations = [
+            "Take steam inhalation twice daily.",
+            "Drink warm water with honey and ginger.",
+            "Avoid chilled or cold beverages."
+        ]
+        medicines = ["Cetirizine 10mg", "Cough Lozenges", "Steam Inhalation Drops"]
+    elif any(k in lower_syms_str for k in ["headache", "migraine"]):
+        severity = "mild"
+        doctor = "Neurologist or General Physician"
+        recommendations = [
+            "Rest in a quiet, dark, well-ventilated room.",
+            "Stay hydrated and reduce digital screen exposure.",
+            "Apply a cool or warm compress across the forehead."
+        ]
+        medicines = ["Ibuprofen 400mg or Paracetamol", "Rest and Quiet Room"]
+    elif any(k in lower_syms_str for k in ["stomach", "acidity", "vomit", "diarrhea", "nausea"]):
+        severity = "moderate"
+        doctor = "Gastroenterologist"
+        recommendations = [
+            "Sip Oral Rehydration Salts (ORS) solution regularly.",
+            "Consume a mild, non-spicy semi-solid diet (bananas, rice, curd).",
+            "Avoid spicy, greasy, or dairy-heavy food."
+        ]
+        medicines = ["Antacid Liquid/Tabs", "ORS Packets", "Probiotic capsules"]
+    else:
+        top_conf = results[0]["confidence"] if results else 70
+        severity = "moderate" if top_conf >= 80 else "mild"
+        doctor = "General Physician"
+        recommendations = [
+            "Ensure generous hydration (3-4L water daily).",
+            "Take adequate rest and monitor your symptoms closely.",
+            "Consult a healthcare professional if symptoms worsen."
+        ]
+        medicines = ["Supportive Care", "Hydration Fluids"]
+
+    possible_conditions = [
+        f"{c['name']} [{c['confidence']}% confidence]" for c in results
+    ] if results else ["General Wellness Check [70% confidence]"]
+
     if not results:
         return {
             "success": True,
+            "symptoms": req.symptoms,
+            "possible_conditions": possible_conditions,
+            "severity": severity,
+            "doctor": doctor,
+            "recommendations": recommendations,
+            "medicines": medicines,
             "predictions": {
                 "conditions": [{"name": "General Wellness Check", "confidence": 70}],
                 "confidence": 70
@@ -256,9 +348,15 @@ async def predict_symptoms_endpoint(req: SymptomPredictionRequest):
 
     return {
         "success": True,
+        "symptoms": req.symptoms,
+        "possible_conditions": possible_conditions,
+        "severity": severity,
+        "doctor": doctor,
+        "recommendations": recommendations,
+        "medicines": medicines,
         "predictions": {
             "conditions": results,
-            "confidence": results[0]["confidence"] if results else 0
+            "confidence": results[0]["confidence"]
         },
         "advice": "This prediction is generated by Python machine learning logic on a clinical dataset of 246,945 records. Always consult a qualified medical professional.",
         "datasetInfo": {
@@ -421,29 +519,37 @@ if os.path.exists(dist_assets):
 
 @app.get("/")
 async def root(request: Request):
-    """Serve frontend index.html if browser requests root, otherwise return API info."""
+    """Serve frontend index.html by default for browser requests, return API info for explicit JSON requests."""
     accept = request.headers.get("accept", "")
     index_html = os.path.join(dist_dir, "index.html")
-    if "text/html" in accept and os.path.exists(index_html):
+
+    if accept == "application/json" or request.query_params.get("format") == "json":
+        return {
+            "message": "Welcome to Jeeva Raksha Healthcare API (Python Stack)",
+            "techStack": "Python 3 + FastAPI + Scikit-Learn",
+            "version": "2.0.0",
+            "endpoints": [
+                "POST /api/chat",
+                "POST /api/predict-symptoms",
+                "GET  /api/dataset-stats",
+                "POST /api/hospitals",
+                "GET  /api/daily-tip",
+                "GET  /api/health-library",
+                "POST /api/health-status",
+                "GET  /api/health",
+                "POST /analyze-symptoms",
+                "POST /similar-diseases",
+                "GET  /medical-info/{disease}"
+            ]
+        }
+
+    if os.path.exists(index_html):
         return FileResponse(index_html)
 
     return {
         "message": "Welcome to Jeeva Raksha Healthcare API (Python Stack)",
         "techStack": "Python 3 + FastAPI + Scikit-Learn",
-        "version": "2.0.0",
-        "endpoints": [
-            "POST /api/chat",
-            "POST /api/predict-symptoms",
-            "GET  /api/dataset-stats",
-            "POST /api/hospitals",
-            "GET  /api/daily-tip",
-            "GET  /api/health-library",
-            "POST /api/health-status",
-            "GET  /api/health",
-            "POST /analyze-symptoms",
-            "POST /similar-diseases",
-            "GET  /medical-info/{disease}"
-        ]
+        "version": "2.0.0"
     }
 
 # SPA Fallback for client-side routing

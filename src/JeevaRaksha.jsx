@@ -1322,14 +1322,33 @@ function SymptomScreen({ onNav }) {
       }, 2000);
     } else {
       try {
-        const response = await fetch('/api/predict-symptoms', {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ symptoms: names })
-        });
-        if (response.ok) {
+        let response;
+        try {
+          response = await fetch('/api/predict-symptoms', {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ symptoms: names })
+          });
+        } catch {
+          response = await fetch(`http://${window.location.hostname}:3001/api/predict-symptoms`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ symptoms: names })
+          });
+        }
+
+        if (response && response.ok) {
           const data = await response.json();
-          setAiReport(data);
+          const processed = {
+            ...data,
+            possible_conditions: data.possible_conditions || (data.predictions?.conditions || []).map(c => `${c.name} [${c.confidence}% confidence]`) || ["General Wellness Check [70% confidence]"],
+            severity: data.severity || "moderate",
+            doctor: data.doctor || "General Physician",
+            recommendations: data.recommendations || ["Take rest and monitor vitals closely.", "Ensure generous hydration (3-4L water daily)."],
+            medicines: data.medicines || ["Paracetamol 650mg", "Multivitamin supplement"],
+            symptoms: data.symptoms || names
+          };
+          setAiReport(processed);
           setStep(2);
         } else {
           throw new Error("API call failed");
@@ -1964,10 +1983,18 @@ function ChatScreen({ username }) {
     setInput(""); setIsTyping(true); setShowSugg(false);
     const newHistory = [...history, { role: "user", content }]; setHistory(newHistory);
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/api/chat`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content, language: LANG_TO_API[lang] || lang })
-      });
+      let res;
+      try {
+        res = await fetch('/api/chat', {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: content, language: LANG_TO_API[lang] || lang })
+        });
+      } catch {
+        res = await fetch(`http://${window.location.hostname}:3001/api/chat`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: content, language: LANG_TO_API[lang] || lang })
+        });
+      }
       const data = await res.json();
       const botContent = data.response || "I'm having trouble. Please try again.";
       const botMsg = { id: Date.now() + 1, role: "assistant", content: botContent, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) };
@@ -3788,10 +3815,18 @@ function AyurvedaScreen() {
     setMessages(prev => [...prev, { id: Date.now(), role: "user", content, time }]);
     setInput(""); setIsTyping(true);
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/api/chat`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content, language: LANG_TO_API[lang] || lang, isAyurveda: true })
-      });
+      let res;
+      try {
+        res = await fetch('/api/chat', {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: content, language: LANG_TO_API[lang] || lang, isAyurveda: true })
+        });
+      } catch {
+        res = await fetch(`http://${window.location.hostname}:3001/api/chat`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: content, language: LANG_TO_API[lang] || lang, isAyurveda: true })
+        });
+      }
       const data = await res.json();
       const botContent = data.response || "Please try again.";
       setMessages(prev => [...prev, { id: Date.now() + 1, role: "assistant", content: botContent, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }]);

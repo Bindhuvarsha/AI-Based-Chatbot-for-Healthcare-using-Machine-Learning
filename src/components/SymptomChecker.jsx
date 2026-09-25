@@ -4,7 +4,7 @@ import { MessageSquare, Send, Sparkles, AlertCircle, Bot, User, Pill, Heart, Ale
 import axios from 'axios';
 import { logError, getErrorMessage, validateSymptoms } from '../utils/errorHandler';
 
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = "/api";
 
 const SymptomChecker = ({ setDiagnosisContext, setActiveTab }) => {
   const [messages, setMessages] = useState([

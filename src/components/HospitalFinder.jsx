@@ -4,7 +4,7 @@ import { Search, MapPin, Navigation, Star, Phone, Globe, AlertCircle, Ambulance,
 import axios from 'axios';
 import { logError, getErrorMessage, validateLocation } from '../utils/errorHandler';
 
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = "/api";
 
 const HospitalFinder = ({ diagnosisContext }) => {
   const [hospitals, setHospitals] = useState([]);
