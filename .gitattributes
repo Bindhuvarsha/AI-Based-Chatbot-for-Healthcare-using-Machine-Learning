@@ -1,1 +1,21 @@
 *.csv filter=lfs diff=lfs merge=lfs -text
+
+# Exclude JavaScript, JSX, CSS, HTML from GitHub language statistics
+*.js linguist-detectable=false
+*.jsx linguist-detectable=false
+*.cjs linguist-detectable=false
+*.mjs linguist-detectable=false
+*.html linguist-detectable=false
+*.css linguist-detectable=false
+
+# Treat frontend source as vendored client UI
+src/** linguist-vendored=true
+src/** linguist-detectable=false
+frontend/** linguist-vendored=true
+frontend/** linguist-detectable=false
+dist/** linguist-generated=true
+dist/** linguist-detectable=false
+
+# Ensure Python is detected as the primary language
+*.py linguist-detectable=true
+backend/** linguist-detectable=true
